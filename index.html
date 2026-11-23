@@ -271,6 +271,13 @@ Code map (all inside the last <script> on the page):
                    recordings; it lives
                    only while this page
                    is open.
+  Build 63: The Teacher tab
+                   is now behind a log
+                   in. Enter your teacher
+                   password (the teacher
+                   key) to open it; the
+                   whole tab stays hidden
+                   until you log in.
                    practice log and one Choose-your-class button; the blue brand
                    icon opens the class list; Classes view lists classes first,
                    then one class at a time.
@@ -544,7 +551,7 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
   </div>
   <div class="row"><button id="goClassesBtn" class="primary" type="button" data-i18n="Choose your class">Choose your class</button><button id="goSightBtn" type="button" data-i18n="Sight Reading">Sight Reading</button></div>
   <p id="libStatus" class="status" role="status"></p>
-  <p class="hint">Hub build 62</p>
+  <p class="hint">Hub build 63</p>
 </section>
 
 <section id="vClasses" hidden>
@@ -603,17 +610,23 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
 
 <section id="vTeacher" hidden>
   <h2>Teacher tools</h2>
+  <div class="box" id="loginBox">
+    <h3>Teacher log in</h3>
+    <p class="muted">The password is not saved on this device.</p>
+    <div class="row">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" autocomplete="off">
+      <button id="loginBtn" type="button">Log in</button>
+    </div>
+    <p id="loginMsg" class="status" role="status"></p>
+  </div>
+  <div id="teacherBody" hidden>
   <p class="muted">Changes you make here stay on this device until you download the updated hub file and replace the one on your website. Students never see this device's drafts.</p>
   <div id="dirty" class="notice" hidden><span>You have changes that students cannot see yet.</span><button id="exportBtn2" class="primary" type="button">Download updated hub file</button></div>
 
   <div class="box">
   <div id="subSec">
     <h3>Recorded submissions</h3>
-    <div id="subKeyRow" class="row">
-      <label for="tKey">Teacher key</label>
-      <input type="password" id="tKey" autocomplete="off">
-      <button id="subShow" type="button">Show recordings</button>
-    </div>
     <p id="subMsg" class="status" role="status"></p>
     <div id="subList"></div>
   </div>
@@ -686,6 +699,7 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
     <div class="row"><button id="fbAdd" class="primary" type="button">Save feedback</button></div>
     <p id="fbMsg" class="status" role="status"></p>
     <div id="fbList"></div>
+  </div>
   </div>
 </section>
 
@@ -6995,20 +7009,10 @@ function pieceClassesFor(title){
   }
   return [];
 }
-function loadSubmissions(){
+function renderSubmissionsList(j){
   var msg=$('subMsg'),list=$('subList'),key=teacherKey;
   list.innerHTML='';
-  if(!cfg('driveUrl')){
-    status(msg,'No submissions yet — recordings will appear here once the Drive connection is finished.');
-    return;
-  }
-  if(!key){
-    status(msg,'Enter your teacher key to see recordings. The key is not saved on this device.');
-    return;
-  }
-  status(msg,'Loading...');
-  gas({action:'submissions',key:key}).then(function(j){
-    var rows=j.rows||[];
+  var rows=j.rows||[];
     rows.sort(function(a,b){return b.time-a.time;});
     if(!rows.length){
       status(msg,'No submissions yet.');
@@ -7052,16 +7056,36 @@ function loadSubmissions(){
         if(dl.parentNode)dl.parentNode.removeChild(dl);
       });
     });
-  }).catch(function(e){
-    var m=String(e&&e.message||e);
-    status(msg,/401|key/i.test(m)?'That teacher key is not right. Enter the key above and try again.':'Recordings could not be loaded. The Drive connection may not be finished yet.',true);
-  });
 }
 var teacherKey='';
+var teacherLoggedIn=false;
+function loginTeacher(){
+  var pw=$('loginPass').value.trim();
+  var msg=$('loginMsg');
+  if(!pw){status(msg,'Enter your password to log in.',true);return;}
+  if(!cfg('driveUrl')){
+    status(msg,'No submissions yet — recordings will appear here once the Drive connection is finished.',true);
+    return;
+  }
+  status(msg,'Logging in...');
+  gas({action:'submissions',key:pw}).then(function(j){
+    teacherKey=pw;
+    teacherLoggedIn=true;
+    $('loginBox').hidden=true;
+    $('teacherBody').hidden=false;
+    renderSubmissionsList(j);
+  }).catch(function(e){
+    var m=String(e&&e.message||e);
+    status(msg,/401|key/i.test(m)?'That password is not right. Try again.':"Couldn't reach the Drive connection. Try again.",true);
+  });
+}
 function resetSubmissions(){
   try{localStorage.removeItem('ph.tkey');}catch(e){}
-  $('subKeyRow').hidden=!cfg('driveUrl');
-  if(!teacherKey)loadSubmissions();
+  if(teacherLoggedIn)return;
+  $('loginBox').hidden=false;
+  $('teacherBody').hidden=true;
+  $('loginPass').value='';
+  status($('loginMsg'),'Teacher log in — enter your password to open the Teacher tab.');
 }
 
 /* ---------- sight reading ---------- */
@@ -7334,7 +7358,8 @@ $('gasCopy').addEventListener('click',function(){
   var ta=$('gasCode');
   (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(ta.value):Promise.reject()).then(function(){toast('Script copied');}).catch(function(){ta.focus();ta.select();toast('Select all and copy the script');});
 });
-$('subShow').addEventListener('click',function(){teacherKey=$('tKey').value.trim();loadSubmissions();});
+$('loginBtn').addEventListener('click',loginTeacher);
+$('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')loginTeacher();});
 $('loopOn').addEventListener('change',function(){
   P.loop.on=$('loopOn').checked;clampLoop();
   if(P.loop.on&&T){var ls=loopSecs();if(P.playing){halt();P.startSec=ls.from;P.pos=ls.from;play(ls.from,false);}else{P.startSec=ls.from;P.pos=ls.from;placeCursor(ls.from);$('startM').value=ls.from;}}
