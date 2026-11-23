@@ -257,6 +257,13 @@ Code map (all inside the last <script> on the page):
                    in an iframe); Recorded
                    submissions moved to the
                    top of the Teacher tab.
+  Build 61: Recorded submissions
+                   now play back through
+                   the web app (the private
+                   Drive files showed an
+                   error in the player);
+                   Download uses the same
+                   playback link.
                    practice log and one Choose-your-class button; the blue brand
                    icon opens the class list; Classes view lists classes first,
                    then one class at a time.
@@ -530,7 +537,7 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
   </div>
   <div class="row"><button id="goClassesBtn" class="primary" type="button" data-i18n="Choose your class">Choose your class</button><button id="goSightBtn" type="button" data-i18n="Sight Reading">Sight Reading</button></div>
   <p id="libStatus" class="status" role="status"></p>
-  <p class="hint">Hub build 60</p>
+  <p class="hint">Hub build 61</p>
 </section>
 
 <section id="vClasses" hidden>
@@ -6974,10 +6981,7 @@ function exportHub(){
   BASE_REV=HUB.rev;dirty=false;$('dirty').hidden=true;DB.set('draft',null);
   toast('Downloaded. Upload it to replace the old hub file.');
 }
-function driveDirectUrl(u){
-  var m=/\/file\/d\/([^\/?]+)\//.exec(u||'');
-  return m?'https://drive.google.com/uc?export=download&id='+m[1]:'';
-}
+function b64ToBlob(b64,mime){var bin=atob(b64);var len=bin.length;var bytes=new Uint8Array(len);for(var i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);return new Blob([bytes],{type:mime||'application/octet-stream'});}
 function pieceClassesFor(title){
   for(var i=0;i<HUB.pieces.length;i++){
     if(HUB.pieces[i].title===title)return HUB.pieces[i].classes||[];
@@ -7011,19 +7015,35 @@ function loadSubmissions(){
     link.textContent='Open the Drive folder';
     msg.appendChild(link);
     rows.forEach(function(r){
-      var direct=driveDirectUrl(r.url);
+      var fm=/\/file\/d\/([^\/?]+)\//.exec(r.url||'');
+      var fileId=fm?fm[1]:'';
       var cls=pieceClassesFor(r.piece);
       var meta=r.piece+(cls.length?' · '+cls.join(', '):'')+' · '+new Date(r.time).toLocaleString()+(r.speed!=null?' · '+r.speed+'%':'')+(r.note?' · '+r.note:'');
-      var dl=direct?h('a',{href:direct},'Download'):(/^https:\/\//.test(r.url||'')?h('a',{href:r.url,target:'_blank',rel:'noopener'},'Download'):null);
-      var audio=direct?h('audio',{controls:true,preload:'none',src:direct}):null;
+      var dl=h('a',null,'Download');
+      var audio=h('audio',{controls:true,preload:'none'});
       var fb=h('button',{type:'button',className:'ghost'},'Feedback');
       fb.addEventListener('click',function(){
         $('fbPiece').value=r.piece;$('fbStudent').value=r.student;
         $('fbText').focus();
       });
-      list.appendChild(h('div',{className:'sub'},
+      var row=h('div',{className:'sub'},
         h('b',null,r.student||'(no name)'),dl,fb,
-        h('small',null,meta),audio));
+        h('small',null,meta),audio);
+      list.appendChild(row);
+      if(!fileId){
+        audio.parentNode.replaceChild(h('small',null,"Couldn't load this recording."),audio);
+        dl.parentNode.removeChild(dl);
+        return;
+      }
+      gas({action:'recording',id:fileId,key:key}).then(function(j){
+        var url=URL.createObjectURL(b64ToBlob(j.data,j.mime||'audio/webm'));
+        audio.src=url;
+        dl.href=url;
+        dl.download=j.name||'recording.webm';
+      }).catch(function(){
+        if(audio.parentNode)audio.parentNode.replaceChild(h('small',null,"Couldn't load this recording."),audio);
+        if(dl.parentNode)dl.parentNode.removeChild(dl);
+      });
     });
   }).catch(function(e){
     var m=String(e&&e.message||e);
