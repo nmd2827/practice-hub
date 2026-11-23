@@ -264,6 +264,13 @@ Code map (all inside the last <script> on the page):
                    error in the player);
                    Download uses the same
                    playback link.
+  Build 62: The teacher key is
+                   no longer saved in the
+                   browser. Type it each
+                   time and tap Show
+                   recordings; it lives
+                   only while this page
+                   is open.
                    practice log and one Choose-your-class button; the blue brand
                    icon opens the class list; Classes view lists classes first,
                    then one class at a time.
@@ -537,7 +544,7 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
   </div>
   <div class="row"><button id="goClassesBtn" class="primary" type="button" data-i18n="Choose your class">Choose your class</button><button id="goSightBtn" type="button" data-i18n="Sight Reading">Sight Reading</button></div>
   <p id="libStatus" class="status" role="status"></p>
-  <p class="hint">Hub build 61</p>
+  <p class="hint">Hub build 62</p>
 </section>
 
 <section id="vClasses" hidden>
@@ -605,7 +612,7 @@ button.brand{border:0;background:transparent;padding:0;text-align:left}
     <div id="subKeyRow" class="row">
       <label for="tKey">Teacher key</label>
       <input type="password" id="tKey" autocomplete="off">
-      <button id="subSaveKey" type="button">Save key</button>
+      <button id="subShow" type="button">Show recordings</button>
     </div>
     <p id="subMsg" class="status" role="status"></p>
     <div id="subList"></div>
@@ -6989,14 +6996,14 @@ function pieceClassesFor(title){
   return [];
 }
 function loadSubmissions(){
-  var msg=$('subMsg'),list=$('subList'),key=LS.get('tkey','');
+  var msg=$('subMsg'),list=$('subList'),key=teacherKey;
   list.innerHTML='';
   if(!cfg('driveUrl')){
     status(msg,'No submissions yet — recordings will appear here once the Drive connection is finished.');
     return;
   }
   if(!key){
-    status(msg,'Enter your teacher key above to see recordings. It will be remembered on this device.');
+    status(msg,'Enter your teacher key to see recordings. The key is not saved on this device.');
     return;
   }
   status(msg,'Loading...');
@@ -7047,14 +7054,14 @@ function loadSubmissions(){
     });
   }).catch(function(e){
     var m=String(e&&e.message||e);
-    status(msg,/401|key/i.test(m)?'That teacher key is not right. Enter the key above and save it to try again.':'Recordings could not be loaded. The Drive connection may not be finished yet.',true);
+    status(msg,/401|key/i.test(m)?'That teacher key is not right. Enter the key above and try again.':'Recordings could not be loaded. The Drive connection may not be finished yet.',true);
   });
 }
-function autoLoadSubmissions(){
-  var saved=LS.get('tkey','');
-  if(saved)$('tKey').value=saved;
+var teacherKey='';
+function resetSubmissions(){
+  try{localStorage.removeItem('ph.tkey');}catch(e){}
   $('subKeyRow').hidden=!cfg('driveUrl');
-  loadSubmissions();
+  if(!teacherKey)loadSubmissions();
 }
 
 /* ---------- sight reading ---------- */
@@ -7219,7 +7226,7 @@ $('newExBtn').addEventListener('click',function(){if(S.sight)openSight(S.sight);
 $('tabPractice').addEventListener('click',function(){leavePiece();classSel=null;renderLibrary();show('vLibrary');});
 $('langBtn').addEventListener('click',function(){LANG=LANG==='es'?'en':'es';LS.set('lang',LANG);applyLang();});
 applyLang();
-$('tabTeacher').addEventListener('click',function(){leavePiece();renderTeacher();show('vTeacher');autoLoadSubmissions();});
+$('tabTeacher').addEventListener('click',function(){leavePiece();renderTeacher();show('vTeacher');resetSubmissions();});
 function showHabitsHome(){$('habitsFlute').hidden=true;$('habitsOboe').hidden=true;$('habitsBassoon').hidden=true;$('habitsClarinet').hidden=true;$('habitsBassClarinet').hidden=true;$('habitsAltoSax').hidden=true;$('habitsTenorSax').hidden=true;$('habitsBaritoneSax').hidden=true;$('habitsTrumpet').hidden=true;$('habitsFrenchHorn').hidden=true;$('habitsTrombone').hidden=true;$('habitsEuphonium').hidden=true;$('habitsBaritoneTC').hidden=true;$('habitsTuba').hidden=true;$('habitsPercussion').hidden=true;$('habitsKeyboardPercussion').hidden=true;$('habitsBass').hidden=true;$('habitsElectricBass').hidden=true;$('habitsHome').hidden=false;window.scrollTo(0,0);}
 function showHabitsClarinet(){$('habitsFlute').hidden=true;$('habitsOboe').hidden=true;$('habitsBassoon').hidden=true;$('habitsBassClarinet').hidden=true;$('habitsAltoSax').hidden=true;$('habitsTenorSax').hidden=true;$('habitsBaritoneSax').hidden=true;$('habitsTrumpet').hidden=true;$('habitsFrenchHorn').hidden=true;$('habitsTrombone').hidden=true;$('habitsEuphonium').hidden=true;$('habitsBaritoneTC').hidden=true;$('habitsTuba').hidden=true;$('habitsPercussion').hidden=true;$('habitsKeyboardPercussion').hidden=true;$('habitsBass').hidden=true;$('habitsElectricBass').hidden=true;$('habitsHome').hidden=true;$('habitsClarinet').hidden=false;window.scrollTo(0,0);}
 function showHabitsAltoSax(){$('habitsFlute').hidden=true;$('habitsOboe').hidden=true;$('habitsBassoon').hidden=true;$('habitsClarinet').hidden=true;$('habitsBassClarinet').hidden=true;$('habitsTenorSax').hidden=true;$('habitsBaritoneSax').hidden=true;$('habitsTrumpet').hidden=true;$('habitsFrenchHorn').hidden=true;$('habitsTrombone').hidden=true;$('habitsEuphonium').hidden=true;$('habitsBaritoneTC').hidden=true;$('habitsTuba').hidden=true;$('habitsPercussion').hidden=true;$('habitsKeyboardPercussion').hidden=true;$('habitsBass').hidden=true;$('habitsElectricBass').hidden=true;$('habitsHome').hidden=true;$('habitsAltoSax').hidden=false;window.scrollTo(0,0);}
@@ -7327,7 +7334,7 @@ $('gasCopy').addEventListener('click',function(){
   var ta=$('gasCode');
   (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(ta.value):Promise.reject()).then(function(){toast('Script copied');}).catch(function(){ta.focus();ta.select();toast('Select all and copy the script');});
 });
-$('subSaveKey').addEventListener('click',function(){LS.set('tkey',$('tKey').value.trim());loadSubmissions();});
+$('subShow').addEventListener('click',function(){teacherKey=$('tKey').value.trim();loadSubmissions();});
 $('loopOn').addEventListener('change',function(){
   P.loop.on=$('loopOn').checked;clampLoop();
   if(P.loop.on&&T){var ls=loopSecs();if(P.playing){halt();P.startSec=ls.from;P.pos=ls.from;play(ls.from,false);}else{P.startSec=ls.from;P.pos=ls.from;placeCursor(ls.from);$('startM').value=ls.from;}}
